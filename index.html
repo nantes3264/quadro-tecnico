@@ -1,0 +1,724 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <title>Quadro Técnico Interativo - Versão Ortogonalizada</title>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            background: #eef2f3;
+            margin: 0;
+            padding: 20px;
+            user-select: none;
+        }
+        #toolbar {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .btn-global {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.2s;
+        }
+        #btnLinha { background: #3498db; color: white; }
+        #btnTexto { background: #2ecc71; color: white; }
+        #btnCaptura { background: #9b59b6; color: white; }
+        .btn-global.active { background: #e74c3c !important; animation: pulse 1.5s infinite; }
+        #info {
+            margin-bottom: 15px;
+            font-size: 14px;
+            color: #555;
+            background: #fff;
+            padding: 10px 20px;
+            border-radius: 20px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.05);
+            text-align: center;
+            max-width: 950px;
+        }
+        #canvasContainer {
+            position: relative;
+            background: #fff;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+        }
+        .popup {
+            display: none;
+            position: absolute;
+            background: white;
+            border-radius: 6px;
+            padding: 12px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.15);
+            border: 1px solid #e0e0e0;
+            z-index: 100;
+            width: 200px;
+        }
+        .popup p { margin: 0 0 6px 0; font-size: 12px; font-weight: bold; color: #333; }
+        .popup button {
+            display: block; width: 100%; margin-bottom: 6px; padding: 6px 10px;
+            border: 1px solid #ccc; background: #f9f9f9; border-radius: 4px;
+            cursor: pointer; font-size: 12px; transition: all 0.2s; text-align: left;
+        }
+        .popup button:hover { background: #007bff; color: white; border-color: #007bff; }
+        .popup button.active { background: #2c3e50; color: white; font-weight: bold; }
+        .picker-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; font-size: 12px; }
+        .picker-row input[type="color"] { cursor: pointer; width: 40px; height: 25px; border: none; padding: 0; }
+        .picker-row input[type="number"] { width: 50px; padding: 2px; }
+        .btn-desfazer { background: #f1c40f !important; color: #333 !important; font-weight: bold; text-align: center !important; }
+        .btn-desfazer:hover { background: #d4ac0d !important; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.6; } 100% { opacity: 1; } }
+    </style>
+</head>
+<body>
+
+<h3>Quadro Técnico de Engenharia (Auto-Ortogonalização Ativa)</h3>
+<div id="toolbar">
+    <button id="btnLinha" class="btn-global" onclick="entrarModoLinha()">⎯ Nova Linha [L]</button>
+    <button id="btnTexto" class="btn-global" onclick="entrarModoTexto()"> T Novo Texto [T]</button>
+    <button id="btnCaptura" class="btn-global" onclick="alternarModoCaptura()">📷 Ativar Captura [C]</button>
+    <button class="btn-global" style="background: #7f8c8d; color: white;" onclick="resetarZoom()">Reset Zoom/Pan</button>
+</div>
+<div id="info">Sincronizando com o banco de dados...</div>
+
+<div id="canvasContainer">
+    <canvas id="canvas" width="1000" height="600"></canvas>
+</div>
+
+<div id="popupLinha" class="popup">
+    <p>Tipo de Linha:</p>
+    <button id="btnReta" onclick="mudarTipoLinha('reta')">⎯⎯ Linha Reta</button>
+    <button id="btnDobra" onclick="mudarTipoLinha('dobra')">⎾⎿ Linha Dobrável</button>
+    <div class="picker-row">
+        <span>Cor do Traço:</span>
+        <input type="color" id="linhaCor" oninput="mudarCorLinha(this.value)">
+    </div>
+    <button class="btn-desfazer" onclick="desfazer()">↶ Desfazer Ação</button>
+</div>
+
+<div id="popupTexto" class="popup">
+    <p>Propriedades do Texto:</p>
+    <div class="picker-row">
+        <span>Cor do Texto:</span>
+        <input type="color" id="textoCorLetra" oninput="mudarPropriedadesTexto('corLetra', this.value)">
+    </div>
+    <div class="picker-row">
+        <span>Fundo da Caixa:</span>
+        <input type="color" id="textoCorFundo" oninput="mudarPropriedadesTexto('corFundo', this.value)">
+    </div>
+    <div class="picker-row">
+        <span>Tamanho (px):</span>
+        <input type="number" id="textoTamanho" min="10" max="72" oninput="mudarPropriedadesTexto('tamanho', parseInt(this.value))">
+    </div>
+    <button class="btn-desfazer" onclick="desfazer()">↶ Desfazer Ação</button>
+</div>
+
+<script>
+// CONFIGURAÇÕES DO SEU SUPABASE
+const SUPABASE_URL = "https://cqrvdyedsidphcbnpqdy.supabase.co"; 
+const SUPABASE_ANON_KEY = "sb_publishable_ZtwZD4BrBMI_-_CcpjjEFw_v5k8lHqo";
+const supabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ID fixo do quadro para salvar tudo em uma única linha persistente no banco
+const ID_QUADRO = "quadro_principal";
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const info = document.getElementById('info');
+
+const popupLinha = document.getElementById('popupLinha');
+const popupTexto = document.getElementById('popupTexto');
+const btnLinha = document.getElementById('btnLinha');
+const btnTexto = document.getElementById('btnTexto');
+const btnCaptura = document.getElementById('btnCaptura');
+
+let linhas = [];
+let imagens = [];
+let textos = [];
+let historico = []; 
+
+let modo = 'selecao'; 
+let modoAnteriorAoPan = 'selecao'; 
+let zoom = 1.0;
+let offsetX = 0;
+let offsetY = 0;
+
+let linhaSelecionada = null;
+let textoSelecionado = null;
+let imagemSelecionada = null; 
+
+let arrastandoPonto = null; 
+let elementoArrastandoGeral = null; 
+let tipoElementoArrastando = '';    
+let mousePos = { x: 0, y: 0 };
+let ultimasCoordenadasMousePan = { x: 0, y: 0 }; 
+let novaLinhaStart = null;
+let capturaStart = { x: 0, y: 0 };
+let capturaEnd = { x: 0, y: 0 };
+
+let arrastandoGripImagem = null; 
+
+const RAIO_PONTO = 6;
+const RAIO_GRIP_IMG = 7;
+
+// FUNÇÕES DE SINCRONIZAÇÃO COM O SUPABASE
+async function salvarNoSupabase() {
+    info.innerText = "Salvando alterações no banco de dados...";
+    
+    // Converte imagens estruturadas em texto Base64 para salvar no JSON do banco
+    const imagensSalvaveis = imagens.map(img => ({
+        src: img.imgElement.src,
+        x: img.x,
+        y: img.y,
+        w: img.w,
+        h: img.h,
+        ratio: img.ratio
+    }));
+
+    const { error } = await supabase
+        .from('quadros')
+        .upsert({
+            id: ID_QUADRO,
+            linhas: linhas,
+            textos: textos,
+            imagens: imagensSalvaveis,
+            updated_at: new Date().toISOString()
+        });
+
+    if (error) {
+        console.error("Erro ao salvar:", error);
+        info.innerText = "Erro ao salvar dados na nuvem.";
+    } else {
+        info.innerText = "Quadro salvo e sincronizado na nuvem com sucesso!";
+    }
+}
+
+async function carregarDoSupabase() {
+    info.innerText = "Carregando dados do servidor...";
+    const { data, error } = await supabase
+        .from('quadros')
+        .select('*')
+        .eq('id', ID_QUADRO)
+        .single();
+
+    if (error && error.code !== 'PGRST116') {
+        console.error("Erro ao carregar:", error);
+        info.innerText = "Erro ao carregar dados do servidor.";
+        return;
+    }
+
+    if (data) {
+        linhas = data.linhas || [];
+        textos = data.textos || [];
+        
+        // Reconstrói objetos de imagem a partir do src/Base64 guardado
+        const imagensCarregadas = data.imagens || [];
+        imagens = [];
+        
+        let carregadasCount = 0;
+        if (imagensCarregadas.length === 0) {
+            info.innerText = "Quadro pronto! Desenhe ou cole imagens (Ctrl+V).";
+            desenhar();
+        }
+
+        imagensCarregadas.forEach(imgData => {
+            const imgElement = new Image();
+            imgElement.src = imgData.src;
+            imgElement.onload = () => {
+                imagens.push({
+                    imgElement: imgElement,
+                    x: imgData.x,
+                    y: imgData.y,
+                    w: imgData.w,
+                    h: imgData.h,
+                    ratio: imgData.ratio
+                });
+                carregadasCount++;
+                if (carregadasCount === imagensCarregadas.length) {
+                    info.innerText = "Quadro carregado com sucesso!";
+                    desenhar();
+                }
+            };
+        });
+    } else {
+        info.innerText = "Nenhum dado anterior encontrado. Quadro inicializado limpo!";
+    }
+    desenhar();
+}
+
+function aplicarAlinhamentoOrtogonal(pontoFixo, pontoMovel) {
+    const dx = pontoMovel.x - pontoFixo.x;
+    const dy = pontoMovel.y - pontoFixo.y;
+    const anguloRad = Math.atan2(dy, dx);
+    let anguloGraus = anguloRad * (180 / Math.PI);
+    if (anguloGraus < 0) anguloGraus += 360;
+
+    const limiarTolerancia = 6; 
+
+    if (Math.abs(anguloGraus - 0) < limiarTolerancia || Math.abs(anguloGraus - 360) < limiarTolerancia || Math.abs(anguloGraus - 180) < limiarTolerancia) {
+        pontoMovel.y = pontoFixo.y;
+    }
+    else if (Math.abs(anguloGraus - 90) < limiarTolerancia || Math.abs(anguloGraus - 270) < limiarTolerancia) {
+        pontoMovel.x = pontoFixo.x;
+    }
+    return pontoMovel;
+}
+
+function salvarEstado() {
+    const estado = {
+        linhas: JSON.parse(JSON.stringify(linhas)),
+        textos: JSON.parse(JSON.stringify(textos)),
+        imagens: imagens.map(img => ({ imgElement: img.imgElement, x: img.x, y: img.y, w: img.w, h: img.h, ratio: img.ratio }))
+    };
+    historico.push(estado);
+    if (historico.length > 30) historico.shift(); 
+}
+
+function desfazer() {
+    if (historico.length > 0) {
+        const penultimoEstado = historico.pop();
+        linhas = penultimoEstado.linhas;
+        imagens = penultimoEstado.imagens;
+        textos = penultimoEstado.textos;
+        linhaSelecionada = null; textoSelecionado = null; imagemSelecionada = null;
+        fecharPopups(); 
+        desenhar();
+        salvarNoSupabase();
+    }
+}
+
+canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const rect = canvas.getBoundingClientRect();
+    const mouseCanvasX = e.clientX - rect.left;
+    const mouseCanvasY = e.clientY - rect.top;
+    const mundoX = (mouseCanvasX - offsetX) / zoom;
+    const mundoY = (mouseCanvasY - offsetY) / zoom;
+
+    if (e.deltaY < 0) zoom *= 1.1;
+    else zoom /= 1.1;
+    zoom = Math.max(0.15, Math.min(zoom, 12));
+
+    offsetX = mouseCanvasX - mundoX * zoom;
+    offsetY = mouseCanvasY - mundoY * zoom;
+    desenhar();
+});
+
+function resetarZoom() { zoom = 1.0; offsetX = 0; offsetY = 0; desenhar(); }
+canvas.addEventListener('contextmenu', (e) => { if (modo === 'pan') e.preventDefault(); });
+
+canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 1) {
+        e.preventDefault();
+        modoAnteriorAoPan = modo; modo = 'pan';
+        maxPanX = e.clientX; maxPanY = e.clientY;
+        ultimasCoordenadasMousePan = { x: e.clientX, y: e.clientY };
+        canvas.style.cursor = 'grabbing'; fecharPopups(); return;
+    }
+
+    const posBruta = getMousePosBruta(e);
+    let posMundo = converterTelaParaMundo(posBruta.x, posBruta.y);
+
+    if (modo === 'captura_click') {
+        modo = 'captura_arrasto';
+        capturaStart = { x: posMundo.x, y: posMundo.y };
+        capturaEnd = { x: posMundo.x, y: posMundo.y };
+        return;
+    }
+
+    if (modo === 'criando_inicio') {
+        novaLinhaStart = { x: posMundo.x, y: posMundo.y }; modo = 'criando_fim'; return;
+    }
+
+    if (modo === 'criando_fim') {
+        salvarEstado();
+        let ajustado = { x: posMundo.x, y: posMundo.y };
+        ajustado = aplicarAlinhamentoOrtogonal(novaLinhaStart, ajustado);
+
+        const novaLinha = {
+            tipo: 'reta', cor: '#555555',
+            pontos: [ { x: novaLinhaStart.x, y: novaLinhaStart.y }, { x: ajustado.x, y: ajustado.y } ]
+        };
+        linhas.push(novaLinha); linhaSelecionada = novaLinha;
+        sairParaModoSelecao(); abrirPopupLinha(e.clientX, e.clientY); 
+        salvarNoSupabase();
+        return;
+    }
+
+    if (modo === 'criando_texto') {
+        const stringDigitada = prompt("Digite o texto:");
+        if (stringDigitada && stringDigitada.trim() !== "") {
+            salvarEstado();
+            const novoTextoObj = {
+                texto: stringDigitada.trim(), x: posMundo.x, y: posMundo.y,
+                corLetra: "#000000", corFundo: "#ffffcc", tamanho: 16
+            };
+            textos.push(novoTextoObj); textoSelecionado = novoTextoObj;
+            sairParaModoSelecao(); abrirPopupTexto(e.clientX, e.clientY);
+            salvarNoSupabase();
+        } else { sairParaModoSelecao(); }
+        return;
+    }
+
+    if (modo === 'selecao') {
+        if (imagemSelecionada) {
+            const img = imagemSelecionada;
+            const grips = {
+                tl: { x: img.x, y: img.y }, tr: { x: img.x + img.w, y: img.y },
+                bl: { x: img.x, y: img.y + img.h }, br: { x: img.x + img.w, y: img.y + img.h }
+            };
+            for (let canto in grips) {
+                if (Math.hypot(grips[canto].x - posMundo.x, grips[canto].y - posMundo.y) < (RAIO_GRIP_IMG * 1.5) / zoom) {
+                    salvarEstado(); arrastandoGripImagem = canto; fecharPopups(); return;
+                }
+            }
+        }
+
+        if (linhaSelecionada) {
+            for (let i = 0; i < linhaSelecionada.pontos.length; i++) {
+                let p = Appento = linhaSelecionada.pontos[i];
+                if (Math.hypot(p.x - posMundo.x, p.y - posMundo.y) < (RAIO_PONTO * 1.5) / zoom) {
+                    salvarEstado(); arrastandoPonto = { SecretLinha: linhaSelecionada, index: i };
+                    fecharPopups(); return;
+                }
+            }
+            if (linhaSelecionada.tipo === 'dobra') {
+                for (let i = 0; i < linhaSelecionada.pontos.length - 1; i++) {
+                    if (verificarHitboxLinha(posMundo.x, posMundo.y, linhaSelecionada.pontos[i], linhaSelecionada.pontos[i+1])) {
+                        salvarEstado();
+                        linhaSelecionada.pontos.splice(i + 1, 0, { x: posMundo.x, y: posMundo.y });
+                        arrastandoPonto = { SecretLinha: linhaSelecionada, index: i + 1 };
+                        fecharPopups(); desenhar(); return;
+                    }
+                }
+            }
+        }
+
+        for (let i = textos.length - 1; i >= 0; i--) {
+            let txt = textos[i];
+            ctx.save(); ctx.font = `${txt.tamanho}px sans-serif`;
+            let larguraCaixa = ctx.measureText(txt.texto).width + 12; let alturaCaixa = txt.tamanho + 8; ctx.restore();
+            if (posMundo.x >= txt.x && posMundo.x <= txt.x + larguraCaixa && posMundo.y >= txt.y - alturaCaixa && posMundo.y <= txt.y) {
+                salvarEstado(); textoSelecionado = txt; linhaSelecionada = null; imagemSelecionada = null;
+                elementoArrastandoGeral = txt; tipoElementoArrastando = 'texto';
+                abrirPopupTexto(e.clientX, e.clientY); desenhar(); return;
+            }
+        }
+
+        for (let i = imagens.length - 1; i >= 0; i--) {
+            let img = imagens[i];
+            if (posMundo.x >= img.x && posMundo.x <= img.x + img.w && posMundo.y >= img.y && posMundo.y <= img.y + img.h) {
+                salvarEstado(); imagemSelecionada = img; linhaSelecionada = null; textoSelecionado = null;
+                elementoArrastandoGeral = img; tipoElementoArrastando = 'imagem';
+                fecharPopups(); desenhar(); return;
+            }
+        }
+
+        let achouLinha = false;
+        for (let linha of linhas) {
+            for (let i = 0; i < linha.pontos.length - 1; i++) {
+                if (verificarHitboxLinha(posMundo.x, posMundo.y, linha.pontos[i], linha.pontos[i+1])) {
+                    linhaSelecionada = linha; textoSelecionado = null; imagemSelecionada = null;
+                    achouLinha = true; abrirPopupLinha(e.clientX, e.clientY); break;
+                }
+            }
+            if (achouLinha) break;
+        }
+        if (!achouLinha) { limparSelecoes(); fecharPopups(); }
+        desenhar();
+    }
+});
+
+canvas.addEventListener('mousemove', (e) => {
+    const posBruta = getMousePosBruta(e);
+    mousePos = posBruta; 
+    let posMundo = converterTelaParaMundo(posBruta.x, posBruta.y);
+
+    if (modo === 'pan') {
+        offsetX += e.clientX - ultimasCoordenadasMousePan.x;
+        offsetY += e.clientY - ultimasCoordenadasMousePan.y;
+        ultimasCoordenadasMousePan = { x: e.clientX, y: e.clientY };
+        desenhar(); return;
+    }
+
+    if (arrastandoGripImagem && imagemSelecionada) {
+        const img = imagemSelecionada;
+        if (arrastandoGripImagem === 'br') {
+            let nw = Math.max(20, posMundo.x - img.x); img.w = nw; img.h = nw / img.ratio;
+        } else if (arrastandoGripImagem === 'bl') {
+            let nw = Math.max(20, (img.x + img.w) - posMundo.x); img.x = (img.x + img.w) - nw; img.w = nw; img.h = nw / img.ratio;
+        } else if (arrastandoGripImagem === 'tr') {
+            let nw = Math.max(20, posMundo.x - img.x); let nh = nw / img.ratio; img.y = (img.y + img.h) - nh; img.w = nw; img.h = nh;
+        } else if (arrastandoGripImagem === 'tl') {
+            let nw = Math.max(20, (img.x + img.w) - posMundo.x); let nh = nw / img.ratio; img.x = (img.x + img.w) - nw; img.y = (img.y + img.h) - nh; img.w = nw; img.h = nh;
+        }
+        desenhar(); return;
+    }
+
+    if (modo === 'captura_arrasto') {
+        capturaEnd = { x: posMundo.x, y: posMundo.y }; desenhar();
+    }
+    else if (arrastandoPonto) {
+        let l = arrastandoPonto.SecretLinha;
+        let idx = arrastandoPonto.index;
+        let pontoMovel = { x: posMundo.x, y: posMundo.y };
+        
+        if (idx > 0) {
+            pontoMovel = aplicarAlinhamentoOrtogonal(l.pontos[idx - 1], pontoMovel);
+        } else if (idx < l.pontos.length - 1) {
+            pontoMovel = aplicarAlinhamentoOrtogonal(l.pontos[idx + 1], pontoMovel);
+        }
+        
+        l.pontos[idx] = pontoMovel;
+        desenhar();
+    } 
+    else if (elementoArrastandoGeral) {
+        if (tipoElementoArrastando === 'imagem') {
+            elementoArrastandoGeral.x = posMundo.x - elementoArrastandoGeral.w / 2;
+            elementoArrastandoGeral.y = posMundo.y - elementoArrastandoGeral.h / 2;
+        } else if (tipoElementoArrastando === 'texto') {
+            elementoArrastandoGeral.x = posMundo.x - 20; elementoArrastandoGeral.y = posMundo.y + 5;
+        }
+        desenhar();
+    }
+    else if (modo === 'criando_fim') {
+        desenhar();
+    }
+    else if (modo === 'captura_click') { desenhar(); }
+});
+
+canvas.addEventListener('mouseup', () => {
+    if (modo === 'pan') {
+        modo = modoAnteriorAoPan;
+        return;
+    }
+    if (modo === 'captura_arrasto') {
+        processarEBaixarCaptura();
+        return;
+    }
+    
+    // Se soltar algum elemento que estava sendo arrastado ou redimensionado, sincroniza com o banco
+    if(arrastandoPonto || elementoArrastandoGeral || arrastandoGripImagem) {
+        salvarNoSupabase();
+    }
+
+    arrastandoPonto = null; elementoArrastandoGeral = null; arrastandoGripImagem = null; tipoElementoArrastando = '';
+});
+
+function verificarHitboxLinha(x, y, p1, p2) {
+    const L2 = Math.pow(p1.x - p2.x, 2) + Math.pow(p1.y - p2.y, 2); if (L2 === 0) return false;
+    let t = Math.max(0, Math.min(1, ((x - p1.x) * (p2.x - p1.x) + (y - p1.y) * (p2.y - p1.y)) / L2));
+    return Math.hypot(x - (p1.x + t * (p2.x - p1.x)), y - (p1.y + t * (p2.y - p1.y))) < 7 / zoom; 
+}
+
+window.addEventListener('keydown', (e) => {
+    const key = e.key.toLowerCase();
+    if (modo === 'selecao') {
+        if (key === 'l') entrarModoLinha(); if (key === 't') entrarModoTexto(); if (key === 'c') alternarModoCaptura();
+    }
+    if (key === 'escape') sairParaModoSelecao();
+    if (e.ctrlKey && key === 'z') { e.preventDefault(); desfazer(); }
+});
+
+function entrarModoLinha() { modo = 'criando_inicio'; limparSelecoes(); fecharPopups(); btnLinha.classList.add('active'); canvas.style.cursor = 'crosshair'; }
+function entrarModoTexto() { modo = 'criando_texto'; limparSelecoes(); fecharPopups(); btnTexto.classList.add('active'); canvas.style.cursor = 'text'; }
+function alternarModoCaptura() {
+    if (modo !== 'captura_click') { modo = 'captura_click'; limparSelecoes(); fecharPopups(); btnCaptura.classList.add('active'); canvas.style.cursor = 'cell'; } 
+    else { sairParaModoSelecao(); }
+}
+function sairParaModoSelecao() {
+    modo = 'selecao'; btnLinha.classList.remove('active'); btnTexto.classList.remove('active'); btnCaptura.classList.remove('active');
+    canvas.style.cursor = 'default'; desenhar();
+}
+function limparSelecoes() { linhaSelecionada = null; textoSelecionado = null; imagemSelecionada = null; arrastandoPonto = null; elementoArrastandoGeral = null; }
+
+// CLIPBOARD IMAGEM (Ctrl + V)
+window.addEventListener('paste', (e) => {
+    const items = e.clipboardData.items;
+    for (let item of items) {
+        if (item.type.indexOf('image') !== -1) {
+            const blob = item.getAsFile();
+            const reader = new FileReader();
+            
+            // Converte a imagem colada em Base64 para garantir armazenamento seguro no JSON
+            reader.onload = (event) => {
+                const imgElement = new Image();
+                imgElement.src = event.target.result;
+                imgElement.onload = () => {
+                    salvarEstado();
+                    const mundoMouse = converterTelaParaMundo(mousePos.x, mousePos.y);
+                    const w = imgElement.width * 0.5; const h = imgElement.height * 0.5;
+                    imagens.push({ imgElement: imgElement, x: mundoMouse.x - w/2, y: mundoMouse.y - h/2, w: w, h: h, ratio: w/h });
+                    desenhar();
+                    salvarNoSupabase();
+                };
+            };
+            reader.readAsDataURL(blob);
+        }
+    }
+});
+
+function getMousePosBruta(e) { const rect = canvas.getBoundingClientRect(); return { x: e.clientX - rect.left, y: e.clientY - rect.top }; }
+function converterTelaParaMundo(telaX, telaY) { return { x: (telaX - offsetX) / zoom, y: (telaY - offsetY) / zoom }; }
+
+function abrirPopupLinha(clientX, clientY) {
+    fecharPopups(); if (!linhaSelecionada) return;
+    popupLinha.style.display = 'block'; popupLinha.style.left = (clientX + 12) + 'px'; popupLinha.style.top = (clientY + 12) + 'px';
+    document.getElementById('btnReta').classList.toggle('active', linhaSelecionada.tipo === 'reta');
+    document.getElementById('btnDobra').classList.toggle('active', linhaSelecionada.tipo === 'dobra');
+    document.getElementById('linhaCor').value = linhaSelecionada.cor || '#555555';
+}
+function abrirPopupTexto(clientX, clientY) {
+    fecharPopups(); if (!textoSelecionado) return;
+    popupTexto.style.display = 'block'; popupTexto.style.left = (clientX + 12) + 'px'; popupTexto.style.top = (clientY + 12) + 'px';
+    document.getElementById('textoCorLetra').value = textoSelecionado.corLetra;
+    document.getElementById('textoCorFundo').value = textoSelecionado.corFundo;
+    document.getElementById('textoTamanho').value = textoSelecionado.tamanho;
+}
+function fecharPopups() { popupLinha.style.display = 'none'; popupTexto.style.display = 'none'; }
+
+function mudarTipoLinha(tipo) {
+    if (linhaSelecionada) {
+        salvarEstado(); linhaSelecionada.tipo = tipo;
+        if (tipo === 'reta' && linhaSelecionada.pontos.length > 2) {
+            linhaSelecionada.pontos = [linhaSelecionada.pontos[0], linhaSelecionada.pontos[linhaSelecionada.pontos.length - 1]];
+        }
+        desenhar();
+        salvarNoSupabase();
+    }
+}
+function mudarCorLinha(novaCor) { 
+    if (linhaSelecionada) { 
+        linhaSelecionada.cor = novaCor; 
+        desenhar(); 
+        salvarNoSupabase();
+    } 
+}
+function mudarPropriedadesTexto(propriedade, valor) { 
+    if (textoSelecionado) { 
+        textoSelecionado[propriedade] = valor; 
+        desenhar(); 
+        salvarNoSupabase();
+    } 
+}
+
+function renderizarCenario(contexto, largura, altura, panX = 0, panY = 0, escalaGeral = 1) {
+    contexto.fillStyle = '#ffffff'; contexto.fillRect(0, 0, largura, altura);
+    contexto.save(); contexto.translate(panX, panY); contexto.scale(escalaGeral, escalaGeral);
+
+    if (escalaGeral === zoom) {
+        contexto.strokeStyle = '#f5f5f5'; contexto.lineWidth = 1;
+        for(let i = -4000; i < 4000; i += 25) {
+            contexto.beginPath(); contexto.moveTo(i, -4000); contexto.lineTo(i, 4000); contexto.stroke();
+            contexto.beginPath(); contexto.moveTo(-4000, i); contexto.lineTo(4000, i); contexto.stroke();
+        }
+    }
+
+    imagens.forEach(img => {
+        try { 
+            contexto.drawImage(img.imgElement, img.x, img.y, img.w, img.h); 
+            if (img === imagemSelecionada && escalaGeral === zoom) {
+                contexto.save(); contexto.strokeStyle = '#007bff'; contexto.lineWidth = 2;
+                contexto.strokeRect(img.x, img.y, img.w, img.h);
+                const cantos = [{ x: img.x, y: img.y }, { x: img.x + img.w, y: img.y }, { x: img.x, y: img.y + img.h }, { x: img.x + img.w, y: img.y + img.h }];
+                cantos.forEach(c => {
+                    contexto.beginPath(); contexto.fillStyle = '#007bff'; contexto.arc(c.x, c.y, RAIO_GRIP_IMG, 0, 2 * Math.PI);
+                    contexto.fill(); contexto.strokeStyle = '#ffffff'; contexto.lineWidth = 1.5; contexto.stroke();
+                });
+                contexto.restore();
+            }
+        } catch(e){}
+    });
+
+    textos.forEach(txt => {
+        contexto.save(); contexto.font = `${txt.tamanho}px sans-serif`;
+        let larguraCaixa = contexto.measureText(txt.texto).width + 12; let alturaCaixa = txt.tamanho + 8;
+        contexto.fillStyle = txt.corFundo; contexto.fillRect(txt.x, txt.y - alturaCaixa, larguraCaixa, alturaCaixa);
+        contexto.strokeStyle = (txt === textoSelecionado && escalaGeral === zoom) ? '#007bff' : '#ccc';
+        contexto.lineWidth = (txt === textoSelecionado && escalaGeral === zoom) ? 2 : 1;
+        contexto.strokeRect(txt.x, txt.y - alturaCaixa, larguraCaixa, alturaCaixa);
+        contexto.fillStyle = txt.corLetra; contexto.textBaseline = "bottom";
+        contexto.fillText(txt.texto, txt.x + 6, txt.y - 4); contexto.restore();
+    });
+
+    linhas.forEach(linha => {
+        const ehSelecionada = (linha === linhaSelecionada && escalaGeral === zoom);
+        contexto.beginPath();
+        contexto.strokeStyle = ehSelecionada ? '#111' : (linha.cor || '#555555');
+        contexto.lineWidth = ehSelecionada ? 5 : 3;
+        contexto.moveTo(linha.pontos[0].x, static = linha.pontos[0].y);
+        for (let i = 1; i < linha.pontos.length; i++) { contexto.lineTo(linha.pontos[i].x, linha.pontos[i].y); }
+        contexto.stroke();
+
+        if (ehSelecionada) {
+            linha.pontos.forEach((ponto, index) => {
+                contexto.beginPath();
+                const ehExtremidade = (index === 0 || index === linha.pontos.length - 1);
+                contexto.fillStyle = ehExtremidade ? '#007bff' : '#ff5722';
+                contexto.arc(ponto.x, ponto.y, RAIO_PONTO, 0, 2 * Math.PI); contexto.fill();
+                contexto.strokeStyle = '#fff'; contexto.lineWidth = 1.5; contexto.stroke();
+            });
+        }
+    });
+
+    contexto.restore();
+}
+
+function desenhar() {
+    renderizarCenario(ctx, canvas.width, canvas.height, offsetX, offsetY, zoom);
+
+    if (modo === 'criando_fim') {
+        ctx.save(); ctx.beginPath(); ctx.strokeStyle = '#007bff'; ctx.lineWidth = 2; ctx.setLineDash([5, 4]);
+        const telaStart = { x: novaLinhaStart.x * zoom + offsetX, y: novaLinhaStart.y * zoom + offsetY };
+        ctx.moveTo(telaStart.x, telaStart.y);
+        
+        let mundoMousePos = converterTelaParaMundo(mousePos.x, mousePos.y);
+        let mundoAjustado = aplicarAlinhamentoOrtogonal(novaLinhaStart, { x: mundoMousePos.x, y: mundoMousePos.y });
+        let telaAjustadaX = mundoAjustado.x * zoom + offsetX;
+        let telaAjustadaY = mundoAjustado.y * zoom + offsetY;
+        
+        ctx.lineTo(telaAjustadaX, telaAjustadaY);
+        ctx.stroke(); ctx.restore();
+    }
+    if (modo === 'captura_arrasto') {
+        ctx.save(); ctx.strokeStyle = '#e74c3c'; ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+        const sX = capturaStart.x * zoom + offsetX; const sY = capturaStart.y * zoom + offsetY;
+        const eX = capturaEnd.x * zoom + offsetX; const eY = capturaEnd.y * zoom + offsetY;
+        ctx.strokeRect(sX, sY, eX - sX, eY - sY);
+        ctx.fillStyle = 'rgba(231, 76, 60, 0.08)'; ctx.fillRect(sX, sY, eX - sX, eY - sY); ctx.restore();
+    }
+}
+
+function processarEBaixarCaptura() {
+    const xMin = Math.min(capturaStart.x, capturaEnd.x); const xMax = Math.max(capturaStart.x, capturaEnd.x);
+    const yMin = Math.min(capturaStart.y, capturaEnd.y); const yMax = Math.max(capturaStart.y, capturaEnd.y);
+    const deltaW = xMax - xMin; const deltaH = yMax - yMin;
+
+    if (deltaW > 5 && deltaH > 5) {
+        const superEscala = 4;
+        const canvasOculto = document.createElement('canvas');
+        canvasOculto.width = deltaW * superEscala; canvasOculto.height = deltaH * superEscala;
+        renderizarCenario(canvasOculto.getContext('2d'), canvasOculto.width, canvasOculto.height, -xMin * superEscala, -yMin * superEscala, superEscala);
+        const linkFalso = document.createElement('a');
+        linkFalso.download = `print_ortogonal_${Math.floor(Date.now()/1000)}.png`;
+        linkFalso.href = canvasOculto.toDataURL('image/png'); linkFalso.click();
+    }
+    sairParaModoSelecao();
+}
+
+// Inicializa chamando os dados do Supabase assim que a página abre
+carregarDoSupabase();
+</script>
+</body>
+</html>
