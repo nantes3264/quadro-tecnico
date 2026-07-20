@@ -2,494 +2,1393 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Quadro Técnico Compartilhado</title>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <title>Quadro Técnico Interativo - Versão Nuvem Supabase</title>
     <style>
         * {
             box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-            user-select: none;
         }
         body {
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            background-color: #1e1e1e;
-            color: #fff;
-            overflow: hidden;
-            height: 100vh;
             display: flex;
             flex-direction: column;
+            align-items: center;
+            background: #eef2f3;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
         }
         #toolbar {
-            background-color: #252526;
-            padding: 10px 20px;
             display: flex;
+            gap: 10px;
+            margin: 10px 0;
             align-items: center;
-            gap: 15px;
-            border-bottom: 1px solid #3c3c3c;
+            background: white;
+            padding: 8px 20px;
+            border-radius: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.05);
             z-index: 10;
-            flex-wrap: wrap;
+            flex-shrink: 0;
         }
-        .tool-group {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            background-color: #2d2d2d;
-            padding: 5px 10px;
-            border-radius: 4px;
-            border: 1px solid #3c3c3c;
+        .btn-global {
+            padding: 10px 18px;
+            border: none;
+            border-radius: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+            transition: all 0.2s;
         }
-        label {
-            font-size: 12px;
-            color: #cccccc;
+        #btnSelecao { background: #f1c40f; color: #2c3e50; }
+        #btnLinha { background: #3498db; color: white; }
+        #btnTexto { background: #2ecc71; color: white; }
+        #btnCaptura { background: #9b59b6; color: white; }
+        #btnDesfazer { background: #7f8c8d; color: white; }
+        #btnBackup { background: #e67e22; color: white; }
+        #btnRestaurar { background: #2c3e50; color: white; }
+        #btnSalvarNuvem { background: #3ecf8e; color: white; }
+        #btnAtualizarNuvem { background: #2980b9; color: white; }
+        #btnAlternarFundo { background: #7f8c8d; color: white; }
+
+        .btn-global.active {
+            transform: scale(0.95);
+            box-shadow: inset 0 3px 5px rgba(0,0,0,0.2);
+            filter: brightness(0.85);
+        }
+        
+        #status {
+            font-size: 13px;
+            font-weight: bold;
+            color: #7f8c8d;
+            margin-left: 5px;
+        }
+
+        #canvasContainer {
+            position: relative;
+            width: 100%;
+            flex-grow: 1;
+            background: #ffffff;
+            overflow: hidden;
+        }
+        canvas {
+            display: block;
+            width: 100%;
+            height: 100%;
+            cursor: default;
+        }
+
+        .popup-painel {
+            position: absolute;
+            background: rgba(255, 255, 255, 0.98);
+            border: 1px solid #ccc;
+            padding: 15px;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0,0,0,0.15);
+            display: none;
+            z-index: 1000;
+            width: 280px;
+            backdrop-filter: blur(5px);
+        }
+        .popup-painel h4 {
+            margin: 0 0 10px 0;
+            font-size: 14px;
+            color: #34495e;
             text-transform: uppercase;
             letter-spacing: 0.5px;
         }
-        button, select, input[type="color"] {
-            background-color: #3e3e3e;
-            color: white;
-            border: 1px solid #555;
-            padding: 6px 12px;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 14px;
-            transition: background 0.2s, border-color 0.2s;
-        }
-        button:hover, select:hover {
-            background-color: #4e4e4e;
-            border-color: #007acc;
-        }
-        button.active {
-            background-color: #007acc;
-            border-color: #0098ff;
-        }
-        input[type="color"] {
-            padding: 2px;
-            width: 40px;
-            height: 30px;
-        }
-        #status-container {
-            margin-left: auto;
+        .popup-row {
             display: flex;
             align-items: center;
+            justify-content: space-between;
+            margin-bottom: 12px;
             gap: 8px;
-            font-size: 13px;
         }
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            border-radius: 50%;
-            background-color: #gray;
-            transition: background 0.3s;
+        .popup-row label {
+            font-size: 12px;
+            font-weight: 600;
+            color: #7f8c8d;
+            width: 90px;
         }
-        .status-online { background-color: #4ecc71; }
-        .status-syncing { background-color: #f1c40f; animation: pulse 1s infinite alternate; }
-        .status-offline { background-color: #e74c3c; }
-        @keyframes pulse {
-            from { opacity: 0.5; }
-            to { opacity: 1; }
-        }
-        #canvas-container {
+        .btn-toggle {
             flex: 1;
-            position: relative;
-            background-color: #1e1e1e;
-            cursor: crosshair;
+            padding: 6px;
+            border: 1px solid #bdc3c7;
+            background: white;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 12px;
+            font-weight: bold;
+            transition: all 0.2s;
         }
-        canvas {
-            position: absolute;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-        }
-        #text-ghost {
-            position: absolute;
-            background: transparent;
-            border: 1px dashed #007acc;
+        .btn-toggle.active {
+            background: #3498db;
             color: white;
-            font-family: inherit;
-            font-size: 16px;
+            border-color: #3498db;
+        }
+        
+        .slider-volume {
+            flex: 1;
+            cursor: pointer;
+        }
+
+        .input-picker-cor {
+            flex: 1;
+            height: 30px;
+            border: 1px solid #bdc3c7;
+            border-radius: 6px;
+            cursor: pointer;
+        }
+
+        .grade-paleta {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 6px;
+            width: 100%;
+            margin-top: 5px;
+        }
+        .slot-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px;
+            background: #f8f9fa;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
             padding: 4px;
-            outline: none;
+        }
+        .caixa-cor {
+            width: 100%;
+            height: 24px;
+            border-radius: 4px;
+            cursor: pointer;
+            border: 2px solid transparent;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+            transition: transform 0.1s;
+        }
+        .caixa-cor:hover {
+            transform: scale(1.05);
+        }
+        .caixa-cor.active-slot {
+            border-color: #2c3e50;
+            box-shadow: 0 0 0 2px #3498db;
+        }
+        .btn-editar-cor {
+            width: 100%;
+            padding: 2px 0;
+            font-size: 9px;
+            border: none;
+            background: #e2e8f0;
+            color: #4a5568;
+            cursor: pointer;
+            border-radius: 3px;
+            font-weight: bold;
+        }
+        .btn-editar-cor:hover {
+            background: #cbd5e1;
+        }
+        .input-cor-oculto {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            opacity: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        #btnDeletarElemento {
+            width: 100%;
+            background: #e74c3c;
+            color: white;
+            border: none;
+            padding: 8px;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 5px;
+            transition: background 0.2s;
+        }
+        #btnDeletarElemento:hover {
+            background: #c0392b;
+        }
+
+        #secaoPropriedadesLinha, #secaoPropriedadesTexto {
             display: none;
-            z-index: 5;
-            caret-color: #007acc;
         }
     </style>
 </head>
 <body>
 
-    <div id="toolbar">
-        <div class="tool-group">
-            <label>Ferramentas</label>
-            <button id="tool-draw" class="active" onclick="setTool('draw')">Caneta</button>
-            <button id="tool-line" onclick="setTool('line')">Linha Reta</button>
-            <button id="tool-rect" onclick="setTool('rect')">Retângulo</button>
-            <button id="tool-text" onclick="setTool('text')">Texto</button>
-            <button id="tool-erase" onclick="setTool('erase')">Borracha</button>
+<div id="toolbar">
+    <button id="btnSelecao" class="btn-global active" onclick="clicarBotaoSelecao()">Seleção ⬈</button>
+    <button id="btnLinha" class="btn-global" onclick="setModo('criando_inicio')">Vetor Linha ↗</button>
+    <button id="btnTexto" class="btn-global" onclick="setModo('criando_texto')">Texto ✍</button>
+    <button id="btnCaptura" class="btn-global" onclick="setModo('captura_click')">Captura 📷</button>
+    <button id="btnDesfazer" class="btn-global" onclick="desfazer()">Desfazer ↩</button>
+    <button id="btnSalvarNuvem" class="btn-global" onclick="salvarNoSupabase()">Salvar Nuvem 💾</button>
+    <button id="btnAtualizarNuvem" class="btn-global" onclick="carregarDoSupabase()">Atualizar 🔄</button>
+    <button id="btnAlternarFundo" class="btn-global" onclick="alternarEstiloFundo()">Fundo: Grade 🌐</button>
+    <button id="btnBackup" class="btn-global" onclick="fazerBackupDados()">Backup 📂</button>
+    <button id="btnRestaurar" class="btn-global" onclick="document.getElementById('inputArquivoBackup').click()">Restaurar 📥</button>
+    <span id="status">Iniciando conexões... ⏳</span>
+</div>
+
+<div id="canvasContainer">
+    <canvas id="quadroCanvas"></canvas>
+    
+    <div id="popupPainelContextual" class="popup-painel">
+        <h4 id="tituloPopup">Configurações</h4>
+        
+        <div id="secaoPropriedadesLinha">
+            <div class="popup-row">
+                <label>Geometria:</label>
+                <button id="btnTipoReta" class="btn-toggle" onclick="alterarTipoLinhaSelecionada('reta')">Reta</button>
+                <button id="btnTipoDobra" class="btn-toggle" onclick="alterarTipoLinhaSelecionada('dobra')">Dobra</button>
+            </div>
+            <div class="popup-row">
+                <label>Espessura:</label>
+                <input type="range" id="sliderEspessura" class="slider-volume" min="1" max="15" value="3" oninput="ajustarEspessuraLinha(this.value)" onchange="commitEspessuraLinha(this.value)">
+            </div>
+            <div>
+                <label style="font-size: 12px; font-weight: 600; color: #7f8c8d;">Paleta Modular:</label>
+                <div id="gridPaletaCores" class="grade-paleta"></div>
+            </div>
         </div>
 
-        <div class="tool-group">
-            <label>Customização</label>
-            <input type="color" id="prop-color" value="#ffffff" onchange="updateProperties()">
-            <select id="prop-thickness" onchange="updateProperties()">
-                <option value="2">Fino (2px)</option>
-                <option value="5" selected>Médio (5px)</option>
-                <option value="10">Grosso (10px)</option>
-                <option value="20">Muito Grosso (20px)</option>
-            </select>
+        <div id="secaoPropriedadesTexto">
+            <div class="popup-row">
+                <label>Tam. Fonte:</label>
+                <input type="range" id="sliderTamanhoTexto" class="slider-volume" min="10" max="72" value="16" oninput="ajustarTamanhoTextoMecanico(this.value)" onchange="commitTamanhoTextoMecanico(this.value)">
+            </div>
+            <div class="popup-row">
+                <label>Cor da Letra:</label>
+                <input type="color" id="pickerCorLetra" class="input-picker-cor" onchange="alterarCorLetraTexto(this.value)">
+            </div>
+            <div class="popup-row">
+                <label>Cor do Fundo:</label>
+                <input type="color" id="pickerCorFundoTexto" class="input-picker-cor" onchange="alterarCorFundoTexto(this.value)">
+            </div>
         </div>
 
-        <button onclick="clearBoard()" style="background-color: #5a1d1d; border-color: #7a2d2d;">Limpar Tudo</button>
-
-        <div id="status-container">
-            <div id="status-indicator" class="status-dot status-offline"></div>
-            <span id="status-text">Conectando...</span>
-        </div>
+        <hr style="border: 0; border-top: 1px solid #eee; margin: 12px 0;">
+        <button id="btnDeletarElemento" onclick="deletarElementoSolicitado()">Remover Objeto</button>
     </div>
+</div>
 
-    <div id="canvas-container">
-        <canvas id="paintCanvas"></canvas>
-        <textarea id="text-ghost" rows="1"></textarea>
-    </div>
+<input type="color" id="auxInputColor" class="input-cor-oculto">
+<input type="file" id="inputArquivoBackup" accept=".json" class="input-cor-oculto" onchange="restaurarBackupDados(event)">
 
-    <script>
-        // Configurações do Supabase (Substitua com suas chaves REAIS se necessário)
-        const SUPABASE_URL = "https://SEU_PROJETO.supabase.co"; 
-        const SUPABASE_KEY = "SUA_ANON_KEY"; 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
-        let supabase = null;
-        if (SUPABASE_URL !== "https://SEU_PROJETO.supabase.co") {
-            supabase = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-        }
+<script>
+const SUPABASE_URL = 'https://gpgaucuwhkrhmtryeidt.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdwZ2F1Y3V3aGtyaG10cnllaWR0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ1NTM2MTUsImV4cCI6MjEwMDEyOTYxNX0.0i9_Q1xaePOYeQszyw9i_PONDi6iWa1etqZ-wCnoxHs';
 
-        // Elementos do DOM
-        const canvas = document.getElementById('paintCanvas');
-        const ctx = canvas.getContext('2d');
-        const container = document.getElementById('canvas-container');
-        const textGhost = document.getElementById('text-ghost');
-        const statusIndicator = document.getElementById('status-indicator');
-        const statusText = document.getElementById('status-text');
+let bancoSupabase = null;
 
-        // Estado do Quadro
-        let currentTool = 'draw'; 
-        let config = { color: '#ffffff', thickness: 5 };
-        let isDrawing = false;
-        let startX = 0, startY = 0;
-        let activeElementId = null;
+const canvas = document.getElementById('quadroCanvas');
+const container = document.getElementById('canvasContainer');
+const ctx = canvas.getContext('2d');
+const popup = document.getElementById('popupPainelContextual');
+const auxInputColor = document.getElementById('auxInputColor');
+const statusTexto = document.getElementById('status');
+const btnAlternarFundo = document.getElementById('btnAlternarFundo');
 
-        // Banco de dados local na memória
-        let boardElements = [];
+let linhas = [];
+let textos = [];
+let imagens = [];
+let modo = 'selecao';
+let manterFundoBrancoCompleto = false; 
 
-        // Inicialização
-        function init() {
-            resizeCanvas();
-            window.addEventListener('resize', resizeCanvas);
-            setupCanvasEvents();
-            setupTextEvents();
-            updateStatus('online', 'Pronto');
-            
-            if (supabase) {
-                loadElementsFromSupabase();
-                subscribeToChanges();
-            } else {
-                updateStatus('offline', 'Modo Local (Sem Supabase)');
-            }
-        }
+let historicoEstados = [];
+const LIMITE_HISTORICO = 30;
 
-        function updateStatus(type, message) {
-            statusIndicator.className = 'status-dot';
-            if (type === 'online') statusIndicator.classList.add('status-online');
-            if (type === 'syncing') statusIndicator.classList.add('status-syncing');
-            if (type === 'offline') statusIndicator.classList.add('status-offline');
-            statusText.innerText = message;
-        }
+let zoom = 1.0;
+let offsetX = 0;
+let offsetY = 0;
+let estaEmPan = false;
+let inicioPanX = 0, inicioPanY = 0;
 
-        function resizeCanvas() {
-            const rect = container.getBoundingClientRect();
-            canvas.width = rect.width;
-            canvas.height = rect.height;
-            render();
-        }
+let elementoSelecionado = null; 
+let tipoSelecionado = null; 
+let arrastandoPonto = null; 
+let elementoArrastandoGeral = null; 
+let arrastandoGripImagem = null;
+let rotacionandoImagem = false;
+let offsetArrastoGeral = { x: 0, y: 0 };
+let indexPontoOriginal = -1;
 
-        function setTool(tool) {
-            currentTool = tool;
-            document.querySelectorAll('#toolbar button').forEach(b => b.classList.remove('active'));
-            const btn = document.getElementById(`tool-${tool}`);
-            if (btn) btn.classList.add('active');
-            if (tool !== 'text') hideTextGhost();
-        }
+let paletaCoresMemoria = [
+    '#3498db', '#e74c3c', '#2ecc71', '#f1c40f', '#9b59b6',
+    '#1abc9c', '#34495e', '#e67e22', '#2c3e50', '#7f8c8d'
+];
+let slotAtivoIndex = 0;
 
-        function updateProperties() {
-            config.color = document.getElementById('prop-color').value;
-            config.thickness = parseInt(document.getElementById('prop-thickness').value);
-        }
+let capturaStart = { x: 0, y: 0 };
+let capturaEnd = { x: 0, y: 0 };
 
-        // Sistema de Desenho e Renderização
-        function render() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
+const DISTANCIA_ALCA_ROTACAO = 30;
+const RAIO_GRIP_ROTACAO = 10;
 
-            boardElements.forEach(el => {
-                ctx.strokeStyle = el.color;
-                ctx.fillStyle = el.color;
-                ctx.lineWidth = el.thickness;
+function atualizarStatus(texto, cor) {
+    statusTexto.innerText = texto;
+    statusTexto.style.color = cor;
+}
 
-                if (el.type === 'draw' || el.type === 'line') {
-                    if (el.pontos && el.pontos.length > 0) {
-                        ctx.beginPath();
-                        ctx.moveTo(el.pontos[0].x, el.pontos[0].y);
-                        for (let i = 1; i < el.pontos.length; i++) {
-                            ctx.lineTo(el.pontos[i].x, el.pontos[i].y);
-                        }
-                        ctx.stroke();
-                    }
-                } else if (el.type === 'rect') {
-                    if (el.pontos && el.pontos.length >= 2) {
-                        const p1 = el.pontos[0];
-                        const p2 = el.pontos[el.pontos.length - 1];
-                        ctx.strokeRect(p1.x, p1.y, p2.x - p1.x, p2.y - p1.y);
-                    }
-                } else if (el.type === 'text') {
-                    if (el.pontos && el.pontos.length > 0) {
-                        ctx.font = `${el.thickness * 3 + 12}px sans-serif`;
-                        ctx.textBaseline = 'top';
-                        ctx.fillText(el.content || '', el.pontos[0].x, el.pontos[0].y);
-                    }
-                }
-            });
-        }
+window.addEventListener('DOMContentLoaded', () => {
+    gerarInterfacePaletaModulas();
+    
+    const observadorRedimensionamento = new ResizeObserver(() => {
+        redimensionarCanvasAjustado();
+    });
+    observadorRedimensionamento.observe(container);
+    redimensionarCanvasAjustado();
+    
+    window.addEventListener('paste', tratarEventoDePaste);
+    configurarEventosTecladoAtalhos();
 
-        function setupCanvasEvents() {
-            const getPos = (e) => {
-                const rect = canvas.getBoundingClientRect();
-                return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+    if (typeof supabase === 'undefined') {
+        atualizarStatus('Erro: Supabase bloqueado localmente.', '#e74c3c');
+        return;
+    }
+    bancoSupabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+    
+    configurarEventosMouseCanvas();
+    configurarEventosZoom();
+    carregarDoSupabase();
+});
+
+function redimensionarCanvasAjustado() {
+    canvas.width = container.clientWidth;
+    canvas.height = container.clientHeight;
+    desenhar();
+}
+
+function alternarEstiloFundo() {
+    manterFundoBrancoCompleto = !manterFundoBrancoCompleto;
+    if (manterFundoBrancoCompleto) {
+        btnAlternarFundo.innerText = "Fundo: Branco ⚪";
+        btnAlternarFundo.style.background = "#2c3e50";
+    } else {
+        btnAlternarFundo.innerText = "Fundo: Grade 🌐";
+        btnAlternarFundo.style.background = "#7f8c8d";
+    }
+    desenhar();
+}
+
+function gerarInterfacePaletaModulas() {
+    const grid = document.getElementById('gridPaletaCores');
+    grid.innerHTML = '';
+    paletaCoresMemoria.forEach((cor, idx) => {
+        const containerSlot = document.createElement('div');
+        containerSlot.className = 'slot-container';
+
+        const caixa = document.createElement('div');
+        caixa.className = 'caixa-cor' + (idx === slotAtivoIndex ? ' active-slot' : '');
+        caixa.style.backgroundColor = cor;
+        
+        caixa.onclick = () => {
+            slotAtivoIndex = idx;
+            atualizarDestaqueSlotsPaleta();
+            aplicarCorSelecionadaNaLinha(cor);
+        };
+
+        const btnEditar = document.createElement('button');
+        btnEditar.className = 'btn-editar-cor';
+        btnEditar.innerText = 'Editar';
+        btnEditar.onclick = (e) => {
+            e.stopPropagation();
+            auxInputColor.value = paletaCoresMemoria[idx];
+            auxInputColor.onchange = (evt) => {
+                const novaCor = evt.target.value;
+                paletaCoresMemoria[idx] = novaCor;
+                caixa.style.backgroundColor = novaCor;
+                slotAtivoIndex = idx;
+                atualizarDestaqueSlotsPaleta();
+                aplicarCorSelecionadaNaLinha(novaCor);
             };
+            auxInputColor.click();
+        };
 
-            canvas.addEventListener('mousedown', (e) => {
-                if (currentTool === 'text') {
-                    showTextGhost(getPos(e));
+        containerSlot.appendChild(caixa);
+        containerSlot.appendChild(btnEditar);
+        grid.appendChild(containerSlot);
+    });
+}
+
+function atualizarDestaqueSlotsPaleta() {
+    const caixas = document.querySelectorAll('.caixa-cor');
+    caixas.forEach((cx, idx) => {
+        if (idx === slotAtivoIndex) {
+            cx.classList.add('active-slot');
+        } else {
+            cx.classList.remove('active-slot');
+        }
+    });
+}
+
+function aplicarCorSelecionadaNaLinha(cor) {
+    if (elementoSelecionado && tipoSelecionado === 'linha') {
+        salvarEstado();
+        elementoSelecionado.cor = cor;
+        desenhar();
+    }
+}
+
+function setModo(novoModo) {
+    modo = novoModo;
+    document.querySelectorAll('.btn-global').forEach(b => {
+        if(b.id !== 'btnAlternarFundo') b.classList.remove('active');
+    });
+    
+    if (novoModo === 'selecao' || novoModo === 'pan') {
+        document.getElementById('btnSelecao').classList.add('active');
+        canvas.style.cursor = novoModo === 'pan' ? 'grab' : 'default';
+    } else if (novoModo === 'criando_inicio' || novoModo === 'criando_fim') {
+        document.getElementById('btnLinha').classList.add('active');
+        canvas.style.cursor = 'crosshair';
+    } else if (novoModo === 'criando_texto') {
+        document.getElementById('btnTexto').classList.add('active');
+        canvas.style.cursor = 'text';
+    } else if (novoModo === 'captura_click' || novoModo === 'captura_arrasto') {
+        document.getElementById('btnCaptura').classList.add('active');
+        canvas.style.cursor = 'cell';
+    }
+    desenhar();
+}
+
+function clicarBotaoSelecao() {
+    desmarcarTodos();
+    setModo('selecao');
+}
+
+function desmarcarTodos() {
+    elementoSelecionado = null;
+    tipoSelecionado = null;
+    popup.style.display = 'none';
+    desenhar();
+}
+
+function transformarCoordenadasMouse(e) {
+    const rect = canvas.getBoundingClientRect();
+    const xTela = e.clientX - rect.left;
+    const yTela = e.clientY - rect.top;
+    return {
+        x: (xTela - offsetX) / zoom,
+        y: (yTela - offsetY) / zoom
+    };
+}
+
+function verificarProximidadePontoSegmento(p, p1, p2, limiar) {
+    const A = p.x - p1.x;
+    const B = p.y - p1.y;
+    const C = p2.x - p1.x;
+    const D = p2.y - p1.y;
+
+    const dot = A * C + B * D;
+    const lenSq = C * C + D * D;
+    let param = -1;
+    if (lenSq !== 0) param = dot / lenSq;
+
+    let xx, yy;
+    if (param < 0) {
+        xx = p1.x;
+        yy = p1.y;
+    } else if (param > 1) {
+        xx = p2.x;
+        yy = p2.y;
+    } else {
+        xx = p1.x + param * C;
+        yy = p1.y + param * D;
+    }
+
+    const dx = p.x - xx;
+    const dy = p.y - yy;
+    return { proximo: Math.hypot(dx, dy) < limiar, x: xx, y: yy };
+}
+
+function salvarEstado() {
+    const snapshot = {
+        linhas: JSON.parse(JSON.stringify(linhas)),
+        textos: JSON.parse(JSON.stringify(textos)),
+        imagens: imagens.map(img => ({
+            id: img.id,
+            dataUrl: img.dataUrl,
+            x: img.x,
+            y: img.y,
+            w: img.w,
+            h: img.h,
+            ratio: img.ratio,
+            angulo: img.angulo || 0
+        }))
+    };
+    historicoEstados.push(snapshot);
+    if (historicoEstados.length > LIMITE_HISTORICO) {
+        historicoEstados.shift();
+    }
+}
+
+function desfazer() {
+    if (historicoEstados.length === 0) return;
+    const ultimoEstado = historicoEstados.pop();
+    linhas = ultimoEstado.linhas;
+    textos = ultimoEstado.textos;
+    
+    imagens = [];
+    ultimoEstado.imagens.forEach(dadoImg => {
+        const nImg = new Image();
+        nImg.src = dadoImg.dataUrl;
+        const objImg = {
+            id: dadoImg.id,
+            dataUrl: dadoImg.dataUrl,
+            x: dadoImg.x,
+            y: dadoImg.y,
+            w: dadoImg.w,
+            h: dadoImg.h,
+            ratio: dadoImg.ratio,
+            angulo: dadoImg.angulo || 0,
+            imgElement: nImg
+        };
+        nImg.onload = () => { desenhar(); };
+        imagens.push(objImg);
+    });
+    
+    desmarcarTodos();
+    desenhar();
+}
+
+async function carregarDoSupabase() {
+    if(!bancoSupabase) return;
+    atualizarStatus('Buscando desenho em nuvem... ⏳', '#e67e22');
+    
+    try {
+        const { data, error } = await bancoSupabase
+            .from('piloto_quadro')
+            .select('dados_json')
+            .eq('id', 1)
+            .single();
+
+        if (error) throw error;
+
+        if (data && data.dados_json) {
+            linhas = data.dados_json.linhas || [];
+            textos = data.dados_json.textos || [];
+            
+            imagens = [];
+            if (data.dados_json.imagens) {
+                data.dados_json.imagens.forEach(imgDado => {
+                    const nImg = new Image();
+                    nImg.src = imgDado.dataUrl;
+                    const novoObjetoImagem = {
+                        id: imgDado.id,
+                        dataUrl: imgDado.dataUrl,
+                        x: imgDado.x,
+                        y: imgDado.y,
+                        w: imgDado.w,
+                        h: imgDado.h,
+                        ratio: imgDado.ratio,
+                        angulo: imgDado.angulo || 0,
+                        imgElement: nImg
+                    };
+                    nImg.onload = () => { desenhar(); };
+                    imagens.push(novoObjetoImagem);
+                });
+            }
+            
+            desmarcarTodos();
+            desenhar();
+            atualizarStatus('Sincronizado com o Supabase! 🟢', '#2ecc71');
+        } else {
+            desenhar();
+            atualizarStatus('Quadro vazio encontrado na nuvem. 🟢', '#2ecc71');
+        }
+    } catch (erro) {
+        atualizarStatus('Erro ao carregar nuvem: ' + erro.message, '#e74c3c');
+        console.error(erro);
+    }
+}
+
+async function salvarNoSupabase() {
+    if(!bancoSupabase) return;
+    atualizarStatus('Salvando dados na nuvem... ⏳', '#e67e22');
+    
+    const pacoteDados = {
+        linhas: linhas,
+        textos: textos,
+        imagens: imagens.map(img => ({
+            id: img.id,
+            dataUrl: img.dataUrl,
+            x: img.x,
+            y: img.y,
+            w: img.w,
+            h: img.h,
+            ratio: img.ratio,
+            angulo: img.angulo || 0
+        })),
+        atualizado_em: new Date().toISOString()
+    };
+
+    try {
+        const { error } = await bancoSupabase
+            .from('piloto_quadro')
+            .update({ dados_json: pacoteDados })
+            .eq('id', 1); 
+
+        if (error) throw error;
+        atualizarStatus('Salvo com sucesso no Supabase! 💾✔️', '#2ecc71');
+    } catch (erro) {
+        atualizarStatus('Erro ao salvar na nuvem: ' + erro.message, '#e74c3c');
+        console.error(erro);
+    }
+}
+
+function fazerBackupDados() {
+    const dadosParaBackup = {
+        exportadoEm: new Date().toISOString(),
+        linhas: linhas,
+        textos: textos,
+        imagens: imagens.map(img => ({
+            id: img.id,
+            dataUrl: img.dataUrl,
+            x: img.x,
+            y: img.y,
+            w: img.w,
+            h: img.h,
+            ratio: img.ratio,
+            angulo: img.angulo || 0
+        }))
+    };
+    const blob = new Blob([JSON.stringify(dadosParaBackup, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.download = `backup_quadro_${Date.now()}.json`;
+    link.href = url;
+    link.click();
+    URL.revokeObjectURL(url);
+}
+
+function restaurarBackupDados(event) {
+    const arquivo = event.target.files[0];
+    if (!arquivo) return;
+    const leitor = new FileReader();
+    leitor.onload = function(e) {
+        try {
+            const dados = JSON.parse(e.target.result);
+            salvarEstado();
+            if (Array.isArray(dados.linhas)) linhas = dados.linhas;
+            if (Array.isArray(dados.textos)) textos = dados.textos;
+            imagens = [];
+            if (Array.isArray(dados.imagens)) {
+                dados.imagens.forEach(imgDado => {
+                    const nImg = new Image();
+                    nImg.src = imgDado.dataUrl;
+                    const nObj = { ...imgDado, imgElement: nImg };
+                    nImg.onload = () => { desenhar(); };
+                    imagens.push(nObj);
+                });
+            }
+            desmarcarTodos();
+            desenhar();
+            atualizarStatus('Backup carregado localmente!', '#2ecc71');
+        } catch (erro) {
+            alert("Erro ao ler arquivo de backup.");
+        }
+    };
+    leitor.readAsText(arquivo);
+    event.target.value = '';
+}
+
+function aplicarAlinhamentoOrtogonal(pontoFixo, pontoMovel) {
+    const dx = pontoMovel.x - pontoFixo.x;
+    const dy = pontoMovel.y - pontoFixo.y;
+    const radianos = Math.atan2(dy, dx);
+    let graus = radianos * (180 / Math.PI);
+    if (graus < 0) graus += 360;
+    const limiar = 6; 
+    if (Math.abs(graus - 0) < limiar || Math.abs(graus - 360) < limiar || Math.abs(graus - 180) < limiar) {
+        pontoMovel.y = pontoFixo.y;
+    } else if (Math.abs(graus - 90) < limiar || Math.abs(graus - 270) < limiar) {
+        pontoMovel.x = pontoFixo.x;
+    }
+}
+
+function tratarEventoDePaste(e) {
+    const itens = (e.clipboardData || e.originalEvent.clipboardData).items;
+    for (let i = 0; i < itens.length; i++) {
+        if (itens[i].type.indexOf('image') !== -1) {
+            const arquivoBlob = itens[i].getAsFile();
+            const leitor = new FileReader();
+            leitor.onload = function(evt) {
+                salvarEstado();
+                const novaImgElement = new Image();
+                novaImgElement.src = evt.target.result;
+                novaImgElement.onload = function() {
+                    const larguraInicial = Math.min(600, novaImgElement.width);
+                    const proporcao = novaImgElement.height / novaImgElement.width;
+                    const alturaCalculada = larguraInicial * proporcao;
+                    const centroX = (-offsetX + canvas.width / 2) / zoom - larguraInicial / 2;
+                    const centroY = (-offsetY + canvas.height / 2) / zoom - alturaCalculada / 2;
+                    
+                    const novoObjetoImagem = {
+                        id: 'img_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                        dataUrl: evt.target.result,
+                        x: centroX,
+                        y: centroY,
+                        w: larguraInicial,
+                        h: alturaCalculada,
+                        ratio: proporcao,
+                        angulo: 0, 
+                        imgElement: novaImgElement
+                    };
+                    imagens.push(novoObjetoImagem);
+                    elementoSelecionado = novoObjetoImagem;
+                    tipoSelecionado = 'imagem';
+                    setModo('selecao');
+                    abrirPopupPropriedades();
+                    desenhar();
+                };
+            };
+            leitor.readAsDataURL(arquivoBlob);
+        }
+    }
+}
+
+function configurarEventosTecladoAtalhos() {
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            const target = e.target.tagName.toLowerCase();
+            if (target !== 'input' && target !== 'textarea') {
+                deletarElementoSolicitado();
+            }
+        }
+        if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'z') {
+            e.preventDefault();
+            desfazer();
+        }
+    });
+}
+
+function configurarEventosZoom() {
+    canvas.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+
+        const mouseMundoX = (mouseX - offsetX) / zoom;
+        const mouseMundoY = (mouseY - offsetY) / zoom;
+
+        const fatorZoom = e.deltaY < 0 ? 1.1 : 1 / 1.1;
+        const novoZoom = Math.min(Math.max(zoom * fatorZoom, 0.1), 10);
+
+        offsetX = mouseX - mouseMundoX * novoZoom;
+        offsetY = mouseY - mouseMundoY * novoZoom;
+        zoom = novoZoom;
+
+        desenhar();
+    }, { passive: false });
+}
+
+function processarDeteccaoElementos(mouseMundo) {
+    if (elementoSelecionado && tipoSelecionado === 'imagem') {
+        const img = elementoSelecionado;
+        const cx = img.x + img.w / 2;
+        const cy = img.y + img.h / 2;
+        const ang = img.angulo || 0;
+        
+        const rxLocal = 0;
+        const ryLocal = -img.h / 2 - DISTANCIA_ALCA_ROTACAO;
+        const rxGlobal = cx + (rxLocal * Math.cos(ang) - ryLocal * Math.sin(ang));
+        const ryGlobal = cy + (rxLocal * Math.sin(ang) + ryLocal * Math.cos(ang));
+        
+        if (Math.hypot(mouseMundo.x - rxGlobal, mouseMundo.y - ryGlobal) < RAIO_GRIP_ROTACAO) {
+            rotacionandoImagem = true;
+            return true;
+        }
+        
+        const gripsLocais = [
+            { x: -img.w/2, y: -img.h/2, id: 'tl' }, { x: img.w/2, y: -img.h/2, id: 'tr' },
+            { x: -img.w/2, y: img.h/2, id: 'bl' }, { x: img.w/2, y: img.h/2, id: 'br' }
+        ];
+        for (let g of gripsLocais) {
+            const gxG = cx + (g.x * Math.cos(ang) - g.y * Math.sin(ang));
+            const gyG = cy + (g.x * Math.sin(ang) + g.y * Math.cos(ang));
+            if (Math.hypot(mouseMundo.x - gxG, mouseMundo.y - gyG) < 8) {
+                arrastandoGripImagem = g.id;
+                salvarEstado();
+                return true;
+            }
+        }
+    }
+
+    for (let l of linhas) {
+        if (!l.pontos) continue;
+        for (let idx = 0; idx < l.pontos.length; idx++) {
+            const p = l.pontos[idx];
+            if (Math.hypot(mouseMundo.x - p.x, mouseMundo.y - p.y) < 8) {
+                elementoSelecionado = l;
+                tipoSelecionado = 'linha';
+                arrastandoPonto = p;
+                indexPontoOriginal = idx;
+                salvarEstado();
+                abrirPopupPropriedades();
+                desenhar();
+                return true;
+            }
+        }
+    }
+    
+    for (let i = imagens.length - 1; i >= 0; i--) {
+        const img = imagens[i];
+        const cx = img.x + img.w / 2;
+        const cy = img.y + img.h / 2;
+        const dx = mouseMundo.x - cx;
+        const dy = mouseMundo.y - cy;
+        const ang = img.angulo || 0;
+        
+        const xLocal = dx * Math.cos(-ang) - dy * Math.sin(-ang);
+        const yLocal = dx * Math.sin(-ang) + dy * Math.cos(-ang);
+        
+        if (xLocal >= -img.w/2 && xLocal <= img.w/2 && yLocal >= -img.h/2 && yLocal <= img.h/2) {
+            elementoSelecionado = img;
+            tipoSelecionado = 'imagem';
+            elementoArrastandoGeral = img;
+            offsetArrastoGeral = { x: mouseMundo.x - img.x, y: mouseMundo.y - img.y };
+            salvarEstado();
+            abrirPopupPropriedades();
+            desenhar();
+            return true;
+        }
+    }
+    
+    for (let t of textos) {
+        const hTxt = t.tamanho || 16;
+        ctx.font = hTxt + "px sans-serif";
+        const wTxt = ctx.measureText(t.texto).width;
+        if (mouseMundo.x >= t.x - 4 && mouseMundo.x <= t.x + wTxt + 4 && mouseMundo.y >= t.y - hTxt - 2 && mouseMundo.y <= t.y + 6) {
+            elementoSelecionado = t;
+            tipoSelecionado = 'texto';
+            elementoArrastandoGeral = t;
+            offsetArrastoGeral = { x: mouseMundo.x - t.x, y: mouseMundo.y - t.y };
+            salvarEstado();
+            abrirPopupPropriedades();
+            desenhar();
+            return true;
+        }
+    }
+    
+    for (let l of linhas) {
+        if (!l.pontos || l.pontos.length < 2) continue;
+        const espessuraReal = l.espessura || 3;
+        for (let k = 0; k < l.pontos.length - 1; k++) {
+            const resultado = verificarProximidadePontoSegmento(mouseMundo, l.pontos[k], l.pontos[k+1], espessuraReal + 6);
+            if (resultado.proximo) {
+                elementoSelecionado = l;
+                tipoSelecionado = 'linha';
+                elementoArrastandoGeral = l;
+                elementoArrastandoGeral.pontosIniciais = l.pontos.map(p => ({ ...p }));
+                offsetArrastoGeral = { x: mouseMundo.x, y: mouseMundo.y };
+                salvarEstado();
+                abrirPopupPropriedades();
+                desenhar();
+                return true;
+            }
+        }
+    }
+    return false;
+}
+
+function configurarEventosMouseCanvas() {
+    // Evento de Duplo Clique para adicionar novos pontos centrais
+    canvas.addEventListener('dblclick', (e) => {
+        if (modo !== 'selecao') return;
+        const mouseMundo = transformarCoordenadasMouse(e);
+        
+        for (let l of linhas) {
+            if (!l.pontos || l.pontos.length < 2) continue;
+            const espessuraReal = l.espessura || 3;
+            for (let k = 0; k < l.pontos.length - 1; k++) {
+                const resultado = verificarProximidadePontoSegmento(mouseMundo, l.pontos[k], l.pontos[k+1], espessuraReal + 8);
+                if (resultado.proximo) {
+                    salvarEstado();
+                    // Adiciona o novo ponto no meio daquele segmento correspondente
+                    const novoPonto = { x: mouseMundo.x, y: mouseMundo.y };
+                    l.pontos.splice(k + 1, 0, novoPonto);
+                    
+                    // Converte automaticamente para tipo "dobra" caso fosse reta simples
+                    l.tipo = 'dobra'; 
+                    
+                    elementoSelecionado = l;
+                    tipoSelecionado = 'linha';
+                    arrastandoPonto = novoPonto; // Já inicia o arrasto automático do ponto criado
+                    indexPontoOriginal = k + 1;
+                    
+                    abrirPopupPropriedades();
+                    desenhar();
                     return;
                 }
-                if (currentTool === 'erase') {
-                    eraseElementAt(getPos(e));
-                    return;
-                }
+            }
+        }
+    });
 
-                isDrawing = true;
-                const pos = getPos(e);
-                startX = pos.x;
-                startY = pos.y;
-                activeElementId = 'el_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-
-                const newElement = {
-                    id: activeElementId,
-                    type: currentTool,
-                    color: config.color,
-                    thickness: config.thickness,
-                    pontos: [pos],
-                    content: ''
+    canvas.addEventListener('mousedown', (e) => {
+        const mouseMundo = transformarCoordenadasMouse(e);
+        
+        if (e.button === 1 || modo === 'pan') {
+            estaEmPan = true;
+            inicioPanX = e.clientX - offsetX;
+            inicioPanY = e.clientY - offsetY;
+            canvas.style.cursor = 'grabbing';
+            return;
+        }
+        
+        if (modo === 'captura_click') {
+            capturaStart = { ...mouseMundo };
+            capturaEnd = { ...mouseMundo };
+            setModo('captura_arrasto');
+            return;
+        }
+        
+        if (modo === 'captura_arrasto') {
+            capturaEnd = { ...mouseMundo };
+            setModo('selecao');
+            processarEBaixarCaptura();
+            return;
+        }
+        
+        if (modo === 'criando_inicio') {
+            salvarEstado();
+            const novaLinha = {
+                id: 'line_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                tipo: 'reta',
+                cor: paletaCoresMemoria[slotAtivoIndex],
+                espessura: 4,
+                pontos: [{ x: mouseMundo.x, y: mouseMundo.y }, { x: mouseMundo.x, y: mouseMundo.y }]
+            };
+            linhas.push(novaLinha);
+            elementoSelecionado = novaLinha;
+            tipoSelecionado = 'linha';
+            setModo('criando_fim');
+            return;
+        }
+        
+        if (modo === 'criando_fim') {
+            if (elementoSelecionado && tipoSelecionado === 'linha') {
+                const pFixo = elementoSelecionado.pontos[0];
+                const pMovel = elementoSelecionado.pontos[1];
+                pMovel.x = mouseMundo.x;
+                pMovel.y = mouseMundo.y;
+                aplicarAlinhamentoOrtogonal(pFixo, pMovel);
+            }
+            abrirPopupPropriedades();
+            setModo('selecao');
+            return;
+        }
+        
+        if (modo === 'criando_texto') {
+            const txtPrompt = prompt("Digite o texto para inserir no quadro:");
+            if (txtPrompt && txtPrompt.trim() !== "") {
+                salvarEstado();
+                const novoTexto = {
+                    id: 'txt_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9),
+                    texto: txtPrompt,
+                    x: mouseMundo.x,
+                    y: mouseMundo.y,
+                    corLetra: '#000000',
+                    corFundo: '#ffffcc',
+                    tamanho: 16
                 };
+                textos.push(novoTexto);
+                elementoSelecionado = novoTexto;
+                tipoSelecionado = 'texto';
+                abrirPopupPropriedades();
+            }
+            setModo('selecao');
+            return;
+        }
+        
+        if (modo === 'selecao') {
+            if (!processarDeteccaoElementos(mouseMundo)) {
+                desmarcarTodos();
+            }
+        }
+    });
 
-                boardElements.push(newElement);
-                render();
+    canvas.addEventListener('mousemove', (e) => {
+        const mouseMundo = transformarCoordenadasMouse(e);
+        
+        if (estaEmPan) {
+            offsetX = e.clientX - inicioPanX;
+            offsetY = e.clientY - inicioPanY;
+            desenhar();
+            return;
+        }
+        
+        if (modo === 'captura_arrasto') {
+            capturaEnd = { ...mouseMundo };
+            desenhar();
+            return;
+        }
+        
+        if (modo === 'criando_fim' && elementoSelecionado && tipoSelecionado === 'linha') {
+            const pFixo = elementoSelecionado.pontos[0];
+            const pMovel = elementoSelecionado.pontos[elementoSelecionado.pontos.length - 1];
+            pMovel.x = mouseMundo.x;
+            pMovel.y = mouseMundo.y;
+            aplicarAlinhamentoOrtogonal(pFixo, pMovel);
+            desenhar();
+            return;
+        }
+        
+        if (modo === 'selecao' && elementoSelecionado) {
+            if (rotacionandoImagem && tipoSelecionado === 'imagem') {
+                const img = elementoSelecionado;
+                const cx = img.x + img.w / 2;
+                const cy = img.y + img.h / 2;
+                const anguloArctan = Math.atan2(mouseMundo.y - cy, mouseMundo.x - cx);
+                img.angulo = anguloArctan + Math.PI / 2; 
+                desenhar();
+                return;
+            }
+
+            if (arrastandoGripImagem && tipoSelecionado === 'imagem') {
+                const img = elementoSelecionado;
+                const dx = mouseMundo.x - img.x;
+                if (dx > 20) {
+                    img.w = dx;
+                    img.h = dx * img.ratio;
+                }
+                desenhar();
+                return;
+            }
+            
+            if (arrastandoPonto && tipoSelecionado === 'linha') {
+                arrastandoPonto.x = mouseMundo.x;
+                arrastandoPonto.y = mouseMundo.y;
+                
+                // Aplica travamento ortogonal com o ponto vizinho imediato anterior/posterior
+                if (indexPontoOriginal > 0) {
+                    aplicarAlinhamentoOrtogonal(elementoSelecionado.pontos[indexPontoOriginal - 1], arrastandoPonto);
+                } else if (indexPontoOriginal < elementoSelecionado.pontos.length - 1) {
+                    aplicarAlinhamentoOrtogonal(elementoSelecionado.pontos[indexPontoOriginal + 1], arrastandoPonto);
+                }
+                desenhar();
+                return;
+            }
+            
+            if (elementoArrastandoGeral) {
+                if (tipoSelecionado === 'texto' || tipoSelecionado === 'imagem') {
+                    elementoArrastandoGeral.x = mouseMundo.x - offsetArrastoGeral.x;
+                    elementoArrastandoGeral.y = mouseMundo.y - offsetArrastoGeral.y;
+                } else if (tipoSelecionado === 'linha') {
+                    const diffX = mouseMundo.x - offsetArrastoGeral.x;
+                    const diffY = mouseMundo.y - offsetArrastoGeral.y;
+                    for (let i = 0; i < elementoArrastandoGeral.pontos.length; i++) {
+                        elementoArrastandoGeral.pontos[i].x = elementoArrastandoGeral.pontosIniciais[i].x + diffX;
+                        elementoArrastandoGeral.pontos[i].y = elementoArrastandoGeral.pontosIniciais[i].y + diffY;
+                    }
+                }
+                desenhar();
+                return;
+            }
+        }
+    });
+
+    canvas.addEventListener('mouseup', () => {
+        if (estaEmPan) {
+            estaEmPan = false;
+            canvas.style.cursor = modo === 'pan' ? 'grab' : 'default';
+        }
+        arrastandoPonto = null;
+        elementoArrastandoGeral = null;
+        arrastandoGripImagem = null;
+        rotacionandoImagem = false;
+        indexPontoOriginal = -1;
+    });
+}
+
+function abrirPopupPropriedades() {
+    if (!elementoSelecionado) return;
+    
+    document.getElementById('secaoPropriedadesLinha').style.display = 'none';
+    document.getElementById('secaoPropriedadesTexto').style.display = 'none';
+    
+    if (tipoSelecionado === 'linha') {
+        document.getElementById('tituloPopup').innerText = "Configurar Vetor";
+        document.getElementById('secaoPropriedadesLinha').style.display = 'block';
+        
+        const tipoLinha = elementoSelecionado.tipo || 'reta';
+        document.getElementById('btnTipoReta').className = 'btn-toggle' + (tipoLinha === 'reta' ? ' active' : '');
+        document.getElementById('btnTipoDobra').className = 'btn-toggle' + (tipoLinha === 'dobra' ? ' active' : '');
+        
+        const esp = elementoSelecionado.espessura || 3;
+        document.getElementById('sliderEspessura').value = esp;
+        
+        const corLinha = elementoSelecionado.cor || '#000000';
+        const matchIdx = paletaCoresMemoria.indexOf(corLinha);
+        if (matchIdx !== -1) {
+            slotAtivoIndex = matchIdx;
+            atualizarDestaqueSlotsPaleta();
+        }
+    } else if (tipoSelecionado === 'texto') {
+        document.getElementById('tituloPopup').innerText = "Configurar Texto";
+        document.getElementById('secaoPropriedadesTexto').style.display = 'block';
+        
+        const tam = elementoSelecionado.tamanho || 16;
+        document.getElementById('sliderTamanhoTexto').value = tam;
+        document.getElementById('pickerCorLetra').value = elementoSelecionado.corLetra || '#000000';
+        document.getElementById('pickerCorFundoTexto').value = elementoSelecionado.corFundo || '#ffffcc';
+    }
+    
+    popup.style.left = '20px';
+    popup.style.top = '80px';
+    popup.style.display = 'block';
+}
+
+function alterarTipoLinhaSelecionada(novoTipo) {
+    if (elementoSelecionado && tipoSelecionado === 'linha') {
+        salvarEstado();
+        elementoSelecionado.tipo = novoTipo;
+        if (novoTipo === 'dobra' && elementoSelecionado.pontos.length === 2) {
+            const p1 = elementoSelecionado.pontos[0];
+            const p2 = elementoSelecionado.pontos[1];
+            const pMedio = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+            elementoSelecionado.pontos.splice(1, 0, pMedio);
+        } else if (novoTipo === 'reta' && elementoSelecionado.pontos.length > 2) {
+            elementoSelecionado.pontos = [
+                elementoSelecionado.pontos[0],
+                elementoSelecionado.pontos[elementoSelecionado.pontos.length - 1]
+            ];
+        }
+        document.getElementById('btnTipoReta').className = 'btn-toggle' + (novoTipo === 'reta' ? ' active' : '');
+        document.getElementById('btnTipoDobra').className = 'btn-toggle' + (novoTipo === 'dobra' ? ' active' : '');
+        desenhar();
+    }
+}
+
+function ajustarEspessuraLinha(v) {
+    if (elementoSelecionado && tipoSelecionado === 'linha') {
+        elementoSelecionado.espessura = parseInt(v);
+        desenhar();
+    }
+}
+function commitEspessuraLinha(v) {
+    if (elementoSelecionado && tipoSelecionado === 'linha') {
+        salvarEstado();
+        elementoSelecionado.espessura = parseInt(v);
+    }
+}
+
+function ajustarTamanhoTextoMecanico(v) {
+    if (elementoSelecionado && tipoSelecionado === 'texto') {
+        elementoSelecionado.tamanho = parseInt(v);
+        desenhar();
+    }
+}
+function commitTamanhoTextoMecanico(v) {
+    if (elementoSelecionado && tipoSelecionado === 'texto') {
+        salvarEstado();
+        elementoSelecionado.tamanho = parseInt(v);
+    }
+}
+
+function alterarCorLetraTexto(c) {
+    if (elementoSelecionado && tipoSelecionado === 'texto') {
+        salvarEstado();
+        elementoSelecionado.corLetra = c;
+        desenhar();
+    }
+}
+
+function alterarCorFundoTexto(c) {
+    if (elementoSelecionado && tipoSelecionado === 'texto') {
+        salvarEstado();
+        elementoSelecionado.corFundo = c;
+        desenhar();
+    }
+}
+
+function deletarElementoSolicitado() {
+    if (!elementoSelecionado) return;
+    salvarEstado();
+    if (tipoSelecionado === 'linha') {
+        linhas = linhas.filter(l => l.id !== elementoSelecionado.id);
+    } else if (tipoSelecionado === 'texto') {
+        textos = textos.filter(t => t.id !== elementoSelecionado.id);
+    } else if (tipoSelecionado === 'imagem') {
+        imagens = imagens.filter(i => i.id !== elementoSelecionado.id);
+    }
+    desmarcarTodos();
+}
+
+function processarEBaixarCaptura() {
+    const xMin = Math.min(capturaStart.x, capturaEnd.x);
+    const xMax = Math.max(capturaStart.x, capturaEnd.x);
+    const yMin = Math.min(capturaStart.y, capturaEnd.y);
+    const yMax = Math.max(capturaStart.y, capturaEnd.y);
+    
+    const wCap = xMax - xMin;
+    const hCap = yMax - yMin;
+    
+    if (wCap < 4 || hCap < 4) {
+        alert("Área muito pequena para captura.");
+        return;
+    }
+    
+    const canvasAux = document.createElement('canvas');
+    canvasAux.width = wCap;
+    canvasAux.height = hCap;
+    const ctxAux = canvasAux.getContext('2d');
+    
+    ctxAux.fillStyle = "#ffffff";
+    ctxAux.fillRect(0, 0, wCap, hCap);
+    
+    ctxAux.save();
+    ctxAux.translate(-xMin, -yMin);
+    
+    imagens.forEach(i => desenharImagemIndividual(ctxAux, i));
+    linhas.forEach(l => desenharLinhaIndividual(ctxAux, l));
+    textos.forEach(t => desenharTextoIndividual(ctxAux, t));
+    
+    ctxAux.restore();
+    
+    const link = document.createElement('a');
+    link.download = `captura_quadro_${Date.now()}.png`;
+    link.href = canvasAux.toDataURL('image/png');
+    link.click();
+}
+
+function desenharLinhaIndividual(contexto, l) {
+    if (!l.pontos || l.pontos.length < 2) return;
+    contexto.beginPath();
+    contexto.strokeStyle = l.cor || '#000000';
+    contexto.lineWidth = l.espessura || 3;
+    contexto.lineCap = 'miter'; 
+    contexto.lineJoin = 'miter'; 
+    
+    contexto.moveTo(l.pontos[0].x, l.pontos[0].y);
+    for (let i = 1; i < l.pontos.length; i++) {
+        contexto.lineTo(l.pontos[i].x, l.pontos[i].y);
+    }
+    contexto.stroke();
+}
+
+function desenharTextoIndividual(contexto, t) {
+    const hTxt = t.tamanho || 16;
+    contexto.font = hTxt + "px sans-serif";
+    const wTxt = contexto.measureText(t.texto).width;
+    
+    if (t.corFundo) {
+        contexto.fillStyle = t.corFundo;
+        contexto.fillRect(t.x - 4, t.y - hTxt - 2, wTxt + 8, hTxt + 8);
+    }
+    contexto.fillStyle = t.corLetra || '#000000';
+    contexto.fillText(t.texto, t.x, t.y);
+}
+
+function desenharImagemIndividual(contexto, i) {
+    if (!i.imgElement) return;
+    contexto.save();
+    const cx = i.x + i.w / 2;
+    const cy = i.y + i.h / 2;
+    contexto.translate(cx, cy);
+    contexto.rotate(i.angulo || 0);
+    contexto.drawImage(i.imgElement, -i.w / 2, -i.h / 2, i.w, i.h);
+    contexto.restore();
+}
+
+function desenhar() {
+    ctx.fillStyle = "#ffffff";
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    if (!manterFundoBrancoCompleto) {
+        ctx.strokeStyle = "#f3f3f3"; 
+        ctx.lineWidth = 1;
+        for (let x = (offsetX % 30); x < canvas.width; x += 30) {
+            ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, canvas.height); ctx.stroke();
+        }
+        for (let y = (offsetY % 30); y < canvas.height; y += 30) {
+            ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(canvas.width, y); ctx.stroke();
+        }
+    }
+
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(zoom, zoom);
+    
+    imagens.forEach(i => desenharImagemIndividual(ctx, i));
+    linhas.forEach(l => desenharLinhaIndividual(ctx, l));
+    textos.forEach(t => desenharTextoIndividual(ctx, t));
+    
+    if (elementoSelecionado) {
+        ctx.strokeStyle = '#3498db';
+        ctx.lineWidth = 1.5 / zoom;
+        
+        if (tipoSelecionado === 'linha' && elementoSelecionado.pontos) {
+            elementoSelecionado.pontos.forEach((p, idx) => {
+                ctx.beginPath();
+                // Destaca os pontos centrais/intermediários com cor diferente se preferir, ou mantém padrão branco
+                ctx.fillStyle = (idx === 0 || idx === elementoSelecionado.pontos.length - 1) ? '#ffffff' : '#f1c40f';
+                ctx.arc(p.x, p.y, 6 / zoom, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
             });
-
-            canvas.addEventListener('mousemove', (e) => {
-                if (!isDrawing) return;
-                const pos = getPos(e);
-                const el = boardElements.find(item => item.id === activeElementId);
-                if (!el) return;
-
-                if (currentTool === 'draw') {
-                    el.pontos.push(pos);
-                } else if (currentTool === 'line' || currentTool === 'rect') {
-                    if (el.pontos.length > 1) el.pontos.pop();
-                    el.pontos.push(pos);
-                }
-                render();
+        } else if (tipoSelecionado === 'texto') {
+            const hTxt = elementoSelecionado.tamanho || 16;
+            ctx.font = hTxt + "px sans-serif";
+            const wTxt = ctx.measureText(elementoSelecionado.texto).width;
+            ctx.strokeRect(elementoSelecionado.x - 6, elementoSelecionado.y - hTxt - 4, wTxt + 12, hTxt + 12);
+        } else if (tipoSelecionado === 'imagem') {
+            const img = elementoSelecionado;
+            ctx.save();
+            const cx = img.x + img.w / 2;
+            const cy = img.y + img.h / 2;
+            ctx.translate(cx, cy);
+            ctx.rotate(img.angulo || 0);
+            
+            ctx.strokeRect(-img.w / 2, -img.h / 2, img.w, img.h);
+            
+            const grips = [
+                { x: -img.w/2, y: -img.h/2 }, { x: img.w/2, y: -img.h/2 },
+                { x: -img.w/2, y: img.h/2 }, { x: img.w/2, y: img.h/2 }
+            ];
+            ctx.fillStyle = '#ffffff';
+            grips.forEach(g => {
+                ctx.beginPath();
+                ctx.arc(g.x, g.y, 5 / zoom, 0, Math.PI * 2);
+                ctx.fill();
+                ctx.stroke();
             });
-
-            window.addEventListener('mouseup', () => {
-                if (!isDrawing) return;
-                isDrawing = false;
-                const el = boardElements.find(item => item.id === activeElementId);
-                if (el) saveElementToSupabase(el);
-                activeElementId = null;
-            });
+            
+            const rx = 0;
+            const ry = -img.h / 2 - DISTANCIA_ALCA_ROTACAO;
+            ctx.beginPath();
+            ctx.moveTo(0, -img.h / 2);
+            ctx.lineTo(rx, ry);
+            ctx.stroke();
+            
+            ctx.fillStyle = '#2ecc71';
+            ctx.beginPath();
+            ctx.arc(rx, ry, RAIO_GRIP_ROTACAO / zoom, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.stroke();
+            
+            ctx.restore();
         }
+    }
+    
+    if (modo === 'captura_arrasto') {
+        ctx.strokeStyle = '#9b59b6';
+        ctx.lineWidth = 2 / zoom;
+        ctx.setLineDash([4, 4]);
+        ctx.strokeRect(capturaStart.x, capturaStart.y, capturaEnd.x - capturaStart.x, capturaEnd.y - capturaStart.y);
+        ctx.setLineDash([]);
+    }
+    ctx.restore();
+}
+</script>
 
-        // Sistema de Texto
-        function showTextGhost(pos) {
-            textGhost.style.display = 'block';
-            textGhost.style.left = pos.x + 'px';
-            textGhost.style.top = pos.y + 'px';
-            textGhost.value = '';
-            textGhost.style.color = config.color;
-            textGhost.style.fontSize = `${config.thickness * 3 + 12}px`;
-            startX = pos.x;
-            startY = pos.y;
-            setTimeout(() => textGhost.focus(), 50);
-        }
-
-        function hideTextGhost() {
-            textGhost.style.display = 'none';
-        }
-
-        function setupTextEvents() {
-            textGhost.addEventListener('keydown', (e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault();
-                    finishText();
-                }
-            });
-            textGhost.addEventListener('blur', finishText);
-        }
-
-        function finishText() {
-            const txt = textGhost.value.trim();
-            if (txt && textGhost.style.display === 'block') {
-                const id = 'el_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5);
-                const newTextEl = {
-                    id: id,
-                    type: 'text',
-                    color: config.color,
-                    thickness: config.thickness,
-                    pontos: [{ x: startX, y: startY }],
-                    content: txt
-                };
-                boardElements.push(newTextEl);
-                render();
-                saveElementToSupabase(newTextEl);
-            }
-            hideTextGhost();
-        }
-
-        // Borracha
-        function eraseElementAt(pos) {
-            let foundIndex = -1;
-            for (let i = boardElements.length - 1; i >= 0; i--) {
-                const el = boardElements[i];
-                if (el.type === 'draw' || el.type === 'line') {
-                    for (let p of el.pontos) {
-                        if (Math.hypot(p.x - pos.x, p.y - pos.y) < el.thickness + 10) {
-                            foundIndex = i;
-                            break;
-                        }
-                    }
-                } else if (el.type === 'rect' && el.pontos.length >= 2) {
-                    const p1 = el.pontos[0];
-                    const p2 = el.pontos[el.pontos.length - 1];
-                    const minX = Math.min(p1.x, p2.x), maxX = Math.max(p1.x, p2.x);
-                    const minY = Math.min(p1.y, p2.y), maxY = Math.max(p1.y, p2.y);
-                    if (pos.x >= minX - 5 && pos.x <= maxX + 5 && pos.y >= minY - 5 && pos.y <= maxY + 5) {
-                        foundIndex = i;
-                    }
-                } else if (el.type === 'text' && el.pontos.length > 0) {
-                    if (Math.hypot(el.pontos[0].x - pos.x, el.pontos[0].y - pos.y) < 40) {
-                        foundIndex = i;
-                    }
-                }
-                if (foundIndex !== -1) break;
-            }
-
-            if (foundIndex !== -1) {
-                const targetId = boardElements[foundIndex].id;
-                boardElements.splice(foundIndex, 1);
-                render();
-                deleteElementFromSupabase(targetId);
-            }
-        }
-
-        function clearBoard() {
-            if (confirm("Deseja mesmo limpar todo o quadro para todos os usuários?")) {
-                boardElements = [];
-                render();
-                if (supabase) {
-                    updateStatus('syncing', 'Limpando banco...');
-                    supabase.from('quadro_elementos').delete().neq('id', '0')
-                    .then(() => updateStatus('online', 'Quadro Limpo'));
-                }
-            }
-        }
-
-        // Integração Remota com o Supabase
-        async function loadElementsFromSupabase() {
-            updateStatus('syncing', 'Buscando dados...');
-            const { data, error } = await supabase.from('quadro_elementos').select('*');
-            if (error) {
-                console.error(error);
-                updateStatus('offline', 'Erro ao carregar dados');
-            } else if (data) {
-                boardElements = data.map(item => ({
-                    id: item.element_id,
-                    type: item.type,
-                    color: item.color,
-                    thickness: item.thickness,
-                    pontos: typeof item.pontos === 'string' ? JSON.parse(item.pontos) : item.pontos,
-                    content: item.content || ''
-                }));
-                render();
-                updateStatus('online', 'Sincronizado');
-            }
-        }
-
-        async function saveElementToSupabase(el) {
-            if (!supabase) return;
-            updateStatus('syncing', 'Salvando elemento...');
-            const { error } = await supabase.from('quadro_elementos').insert([{
-                element_id: el.id,
-                type: el.type,
-                color: el.color,
-                thickness: el.thickness,
-                pontos: JSON.stringify(el.pontos),
-                content: el.content
-            }]);
-            if (error) updateStatus('offline', 'Erro de conexão');
-            else updateStatus('online', 'Salvo com sucesso');
-        }
-
-        async function deleteElementFromSupabase(id) {
-            if (!supabase) return;
-            updateStatus('syncing', 'Removendo elemento...');
-            const { error } = await supabase.from('quadro_elementos').delete().eq('element_id', id);
-            if (error) updateStatus('offline', 'Erro ao apagar');
-            else updateStatus('online', 'Removido');
-        }
-
-        function subscribeToChanges() {
-            supabase.channel('custom-filter-channel')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'quadro_elementos' }, (payload) => {
-                if (payload.eventType === 'INSERT') {
-                    const newItem = payload.new;
-                    if (!boardElements.some(el => el.id === newItem.element_id)) {
-                        boardElements.push({
-                            id: newItem.element_id,
-                            type: newItem.type,
-                            color: newItem.color,
-                            thickness: newItem.thickness,
-                            pontos: typeof newItem.pontos === 'string' ? JSON.parse(newItem.pontos) : newItem.pontos,
-                            content: newItem.content || ''
-                        });
-                        render();
-                    }
-                } else if (payload.eventType === 'DELETE') {
-                    // Se o banco foi todo limpo
-                    if (!payload.old || !payload.old.element_id) {
-                        boardElements = [];
-                    } else {
-                        boardElements = boardElements.filter(el => el.id !== payload.old.element_id);
-                    }
-                    render();
-                }
-            })
-            .subscribe();
-        }
-
-        // Executa ao carregar a página
-        window.onload = init;
-    </script>
 </body>
 </html>
